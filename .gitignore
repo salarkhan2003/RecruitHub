@@ -4,7 +4,20 @@ dist/
 coverage/
 .DS_Store
 *.log
-.env*
+.env
+.env.*
 !.env.example
+*.local
+*.secret
 
+# Firebase
+firebase-applet-config.json
+firestore.rules
+firebase-blueprint.json
+
+# Database
+dev.db
+dev.db-journal
+
+# Prisma
 /src/generated/prisma

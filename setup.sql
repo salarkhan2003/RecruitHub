@@ -39,7 +39,10 @@ CREATE TABLE IF NOT EXISTS "Submission" (
   "completedAt" TIMESTAMP WITH TIME ZONE,
   "userId" TEXT NOT NULL REFERENCES "User"("id") ON DELETE CASCADE,
   "testId" TEXT NOT NULL REFERENCES "Test"("id") ON DELETE CASCADE,
-  "answers" TEXT NOT NULL -- JSON stringified map
+  "answers" TEXT NOT NULL, -- JSON stringified map
+  "recruitmentStatus" TEXT DEFAULT 'PENDING', -- 'PENDING', 'SHORTLISTED', 'INTERVIEW_SCHEDULED', 'OFFER_SENT', 'REJECTED'
+  "interviewLink" TEXT,
+  "recruiterNotes" TEXT
 );
 
 -- Enable RLS (Optional but recommended)

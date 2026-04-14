@@ -225,6 +225,35 @@ app.get("/api/tests/:id/results", async (req, res) => {
   }
 });
 
+// Recruiter: Update Recruitment Status
+app.patch("/api/submissions/:id/status", async (req, res) => {
+  const { id } = req.params;
+  const { recruitmentStatus, interviewLink, recruiterNotes } = req.body;
+  
+  try {
+    const { data: updated, error } = await supabase
+      .from("Submission")
+      .update({ 
+        recruitmentStatus, 
+        interviewLink, 
+        recruiterNotes 
+      })
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    
+    // Notify recruiter/client via socket if needed
+    io.emit("submission_status_updated", { submissionId: id, status: recruitmentStatus });
+    
+    res.json(updated);
+  } catch (error: any) {
+    console.error("Update recruitment status error:", error);
+    res.status(500).json({ error: "Failed to update status", details: error.message || error });
+  }
+});
+
 // Student: Get Available Tests
 app.get("/api/tests", async (req, res) => {
   try {

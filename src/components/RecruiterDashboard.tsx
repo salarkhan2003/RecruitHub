@@ -6,13 +6,15 @@ import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Users, ClipboardList, BarChart3, Trash2, AlertCircle, Sparkles, Lock, Unlock, Download, Search, Tag, Pencil, X, Eye, CheckCircle2, XCircle, RefreshCw } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Plus, Users, ClipboardList, BarChart3, Trash2, AlertCircle, Sparkles, Lock, Unlock, Download, Search, Tag, Pencil, X, Eye, CheckCircle2, XCircle, RefreshCw, Mail, Calendar, Send, MoreHorizontal } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { useAuthStore } from '@/lib/store';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { motion, AnimatePresence } from 'motion/react';
 import { GoogleGenAI, Type } from "@google/genai";
 import { io } from 'socket.io-client';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
 const socket = io();
@@ -289,6 +291,45 @@ export const RecruiterDashboard = () => {
   );
 
   const [selectedSubmission, setSelectedSubmission] = useState<any>(null);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [statusForm, setStatusForm] = useState({
+    recruitmentStatus: 'PENDING',
+    interviewLink: '',
+    recruiterNotes: ''
+  });
+
+  useEffect(() => {
+    if (selectedSubmission) {
+      setStatusForm({
+        recruitmentStatus: selectedSubmission.recruitmentStatus || 'PENDING',
+        interviewLink: selectedSubmission.interviewLink || '',
+        recruiterNotes: selectedSubmission.recruiterNotes || ''
+      });
+    }
+  }, [selectedSubmission]);
+
+  const updateRecruitmentStatus = async () => {
+    if (!selectedSubmission) return;
+    setIsUpdatingStatus(true);
+    try {
+      const res = await fetch(`/api/submissions/${selectedSubmission.id}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(statusForm),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setResults(prev => prev.map(r => r.id === updated.id ? { ...r, ...updated } : r));
+        setSelectedSubmission(prev => ({ ...prev, ...updated }));
+        setError(null);
+      }
+    } catch (err) {
+      console.error("Failed to update status:", err);
+      setError("Failed to update recruitment status");
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
 
   const getScoreDistribution = () => {
     const distribution = [
@@ -578,7 +619,87 @@ export const RecruiterDashboard = () => {
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-6 py-4">
-                {selectedSubmission.test.questions.map((q: any, idx: number) => {
+                <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 space-y-4">
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-slate-500 flex items-center gap-2">
+                    <Sparkles className="w-4 h-4" /> Recruitment Workflow
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Candidate Status</Label>
+                      <Select 
+                        value={statusForm.recruitmentStatus} 
+                        onValueChange={(val) => setStatusForm(prev => ({ ...prev, recruitmentStatus: val }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="PENDING">Pending Review</SelectItem>
+                          <SelectItem value="SHORTLISTED">Shortlisted</SelectItem>
+                          <SelectItem value="INTERVIEW_SCHEDULED">Interview Scheduled</SelectItem>
+                          <SelectItem value="OFFER_SENT">Offer Sent</SelectItem>
+                          <SelectItem value="REJECTED">Rejected</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Interview Link</Label>
+                      <div className="flex gap-2">
+                        <Input 
+                          placeholder="https://meet.google.com/..." 
+                          value={statusForm.interviewLink}
+                          onChange={(e) => setStatusForm(prev => ({ ...prev, interviewLink: e.target.value }))}
+                        />
+                        <Button 
+                          variant="outline" 
+                          size="icon" 
+                          className="shrink-0"
+                          title="Copy Link"
+                          onClick={() => {
+                            if (statusForm.interviewLink) {
+                              navigator.clipboard.writeText(statusForm.interviewLink);
+                            }
+                          }}
+                        >
+                          <ClipboardList className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Recruiter Notes</Label>
+                    <Textarea 
+                      placeholder="Add internal notes about this candidate..." 
+                      className="min-h-[80px]"
+                      value={statusForm.recruiterNotes}
+                      onChange={(e) => setStatusForm(prev => ({ ...prev, recruiterNotes: e.target.value }))}
+                    />
+                  </div>
+                  <div className="flex gap-3">
+                    <Button 
+                      onClick={updateRecruitmentStatus} 
+                      disabled={isUpdatingStatus}
+                      className="flex-1 gap-2"
+                    >
+                      {isUpdatingStatus ? "Updating..." : "Update Status"}
+                    </Button>
+                    {statusForm.recruitmentStatus === 'SHORTLISTED' && (
+                      <Button 
+                        variant="outline"
+                        onClick={() => setStatusForm(prev => ({ ...prev, recruitmentStatus: 'INTERVIEW_SCHEDULED' }))}
+                        className="gap-2 border-purple-200 text-purple-700 hover:bg-purple-50"
+                      >
+                        <Calendar className="w-4 h-4" /> Schedule Interview
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-slate-500 flex items-center gap-2">
+                    <ClipboardList className="w-4 h-4" /> Question Breakdown
+                  </h3>
+                  {selectedSubmission.test.questions.map((q: any, idx: number) => {
                   const answers = JSON.parse(selectedSubmission.answers);
                   const studentAnswer = answers[q.id];
                   const options = JSON.parse(q.options);
@@ -628,6 +749,7 @@ export const RecruiterDashboard = () => {
                     </div>
                   );
                 })}
+                </div>
               </div>
             </DialogContent>
           </Dialog>
@@ -743,18 +865,38 @@ export const RecruiterDashboard = () => {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Student</TableHead>
-                      <TableHead>Status</TableHead>
+                      <TableHead>Test Status</TableHead>
+                      <TableHead>Recruitment</TableHead>
                       <TableHead>Score</TableHead>
-                      <TableHead className="text-right">Date</TableHead>
+                      <TableHead className="text-right">Action</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {results.map((res) => (
                       <TableRow key={res.id}>
-                        <TableCell className="font-medium">{res.user.name}</TableCell>
+                        <TableCell className="font-medium">
+                          <div className="flex flex-col">
+                            <span>{res.user.name}</span>
+                            <span className="text-[10px] text-muted-foreground">{res.user.email}</span>
+                          </div>
+                        </TableCell>
                         <TableCell>
-                          <Badge variant={res.status === 'COMPLETED' ? 'default' : 'secondary'}>
+                          <Badge variant={res.status === 'COMPLETED' ? 'default' : 'secondary'} className="text-[10px]">
                             {res.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={cn(
+                            "text-[10px] gap-1",
+                            res.recruitmentStatus === 'SHORTLISTED' ? "bg-blue-100 text-blue-700 hover:bg-blue-100 border-blue-200" :
+                            res.recruitmentStatus === 'INTERVIEW_SCHEDULED' ? "bg-purple-100 text-purple-700 hover:bg-purple-100 border-purple-200" :
+                            res.recruitmentStatus === 'OFFER_SENT' ? "bg-green-100 text-green-700 hover:bg-green-100 border-green-200" :
+                            res.recruitmentStatus === 'REJECTED' ? "bg-red-100 text-red-700 hover:bg-red-100 border-red-200" :
+                            "bg-slate-100 text-slate-700 hover:bg-slate-100 border-slate-200"
+                          )}>
+                            {res.recruitmentStatus === 'INTERVIEW_SCHEDULED' && <Calendar className="w-3 h-3" />}
+                            {res.recruitmentStatus === 'OFFER_SENT' && <Send className="w-3 h-3" />}
+                            {res.recruitmentStatus || 'PENDING'}
                           </Badge>
                         </TableCell>
                         <TableCell>
@@ -767,9 +909,19 @@ export const RecruiterDashboard = () => {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-2">
-                            <span className="text-muted-foreground text-xs">
-                              {new Date(res.completedAt || res.startedAt).toLocaleDateString()}
-                            </span>
+                            {res.recruitmentStatus === 'PENDING' && (
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="h-8 text-[10px] border-blue-200 text-blue-600 hover:bg-blue-50"
+                                onClick={() => {
+                                  setSelectedSubmission(res);
+                                  setStatusForm(prev => ({ ...prev, recruitmentStatus: 'SHORTLISTED' }));
+                                }}
+                              >
+                                Shortlist
+                              </Button>
+                            )}
                             <Button 
                               variant="ghost" 
                               size="icon" 
@@ -784,7 +936,7 @@ export const RecruiterDashboard = () => {
                     ))}
                     {results.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                           No submissions yet.
                         </TableCell>
                       </TableRow>
