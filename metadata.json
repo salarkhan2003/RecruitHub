@@ -1,0 +1,5 @@
+{
+  "name": "Recruitment Testing Platform",
+  "description": "A full-stack platform for recruiters to create tests and students to take exams with secure timers and auto-submission.",
+  "requestFramePermissions": []
+}

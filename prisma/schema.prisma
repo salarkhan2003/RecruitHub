@@ -1,0 +1,51 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  role      String   // "RECRUITER" or "STUDENT"
+  createdAt DateTime @default(now())
+  tests     Test[]   @relation("TestCreator")
+  submissions Submission[]
+}
+
+model Test {
+  id          String     @id @default(cuid())
+  title       String
+  description String?
+  duration    Int        // in minutes
+  createdAt   DateTime   @default(now())
+  creatorId   String
+  creator     User       @relation("TestCreator", fields: [creatorId], references: [id])
+  questions   Question[]
+  submissions Submission[]
+}
+
+model Question {
+  id            String   @id @default(cuid())
+  text          String
+  options       String   // JSON stringified array of options
+  correctAnswer Int      // Index of the correct option
+  testId        String
+  test          Test     @relation(fields: [testId], references: [id], onDelete: Cascade)
+}
+
+model Submission {
+  id          String   @id @default(cuid())
+  score       Float?
+  status      String   // "COMPLETED", "IN_PROGRESS"
+  startedAt   DateTime @default(now())
+  completedAt DateTime?
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  testId      String
+  test        Test     @relation(fields: [testId], references: [id])
+  answers     String   // JSON stringified map of questionId -> selectedOptionIndex
+}
