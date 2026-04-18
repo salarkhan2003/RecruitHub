@@ -2,10 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useAuthStore } from './lib/store';
 import { Auth } from './components/Auth';
 import { RecruiterDashboard } from './components/RecruiterDashboard';
-import { TestList } from './components/TestList';
+import { CandidatePortal } from './components/CandidatePortal';
 import { StudentExamRoom } from './components/StudentExamRoom';
 import { Button } from './components/ui/button';
-import { LogOut, User as UserIcon } from 'lucide-react';
+import { LogOut, User as UserIcon, Briefcase } from 'lucide-react';
 import { supabase } from './lib/supabase';
 
 export default function App() {
@@ -17,9 +17,14 @@ export default function App() {
     const syncUser = async (email: string, session: any, retryCount = 0) => {
       try {
         // First, check if server is healthy
-        const healthRes = await fetch('/api/health').catch(() => ({ ok: false }));
-        if (!healthRes.ok) {
-          throw new Error("Server not ready");
+        const healthRes = await fetch('/api/health').catch(() => null);
+        if (!healthRes || !healthRes.ok) {
+          if (retryCount < 10) {
+            const delay = Math.min(1000 * Math.pow(1.5, retryCount), 5000);
+            setTimeout(() => syncUser(email, session, retryCount + 1), delay);
+            return;
+          }
+          throw new Error("Server not responding after multiple attempts");
         }
 
         const res = await fetch(`/api/me?email=${encodeURIComponent(email)}`);
@@ -68,9 +73,14 @@ export default function App() {
     const checkSession = async (retryCount = 0) => {
       try {
         // First, check if server is healthy
-        const healthRes = await fetch('/api/health').catch(() => ({ ok: false }));
-        if (!healthRes.ok) {
-          throw new Error("Server not ready");
+        const healthRes = await fetch('/api/health').catch(() => null);
+        if (!healthRes || !healthRes.ok) {
+          if (retryCount < 10) {
+            const delay = Math.min(1000 * Math.pow(1.5, retryCount), 5000);
+            setTimeout(() => checkSession(retryCount + 1), delay);
+            return;
+          }
+          throw new Error("Server not responding after multiple attempts");
         }
 
         const { data: { session } } = await supabase.auth.getSession();
@@ -170,7 +180,7 @@ export default function App() {
           </div>
         </div>
       </nav>
-      <TestList onSelectTest={(test) => setActiveTest(test)} />
+      <CandidatePortal user={user} onSelectTest={(test) => setActiveTest(test)} />
     </div>
   );
 }

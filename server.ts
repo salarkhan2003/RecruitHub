@@ -28,7 +28,7 @@ app.get("/api/health", (req, res) => {
 
 // Diagnostic: Check Database Tables
 app.get("/api/debug/db", async (req, res) => {
-  const tables = ["User", "Test", "Question", "Submission"];
+  const tables = ["User", "Test", "Question", "Submission", "Job", "JobField", "Application", "UserProfile", "Company"];
   const results: Record<string, any> = {};
 
   for (const table of tables) {
@@ -47,7 +47,7 @@ app.get("/api/me", async (req, res) => {
   try {
     const { data: user, error } = await supabase
       .from("User")
-      .select("*")
+      .select("*, company:Company(*)")
       .eq("email", email)
       .single();
 
@@ -84,6 +84,232 @@ app.post("/api/login", async (req, res) => {
   } catch (error: any) {
     console.error("Login error:", error);
     res.status(500).json({ error: "Login failed", details: error.message || error });
+  }
+});
+
+// Job Management
+app.get("/api/jobs", async (req, res) => {
+  try {
+    const { data: jobs, error } = await supabase
+      .from("Job")
+      .select("*, creator:User(*), company:Company(*), fields:JobField(*)")
+      .order("createdAt", { ascending: false });
+    if (error) throw error;
+    res.json(jobs);
+  } catch (error: any) {
+    res.status(500).json({ error: "Failed to fetch jobs" });
+  }
+});
+
+app.post("/api/jobs", async (req, res) => {
+  const { title, description, requirements, location, type, salaryRange, creatorId, fields, companyId } = req.body;
+  try {
+    let finalCompanyId = companyId;
+
+    if (!finalCompanyId) {
+      const { data: user } = await supabase.from("User").select("companyId").eq("id", creatorId).single();
+      finalCompanyId = user?.companyId;
+    }
+
+    const { data: job, error: jobError } = await supabase
+      .from("Job")
+      .insert([{ title, description, requirements, location, type, salaryRange, creatorId, companyId: finalCompanyId }])
+      .select()
+      .single();
+    if (jobError) throw jobError;
+
+    if (fields && Array.isArray(fields)) {
+      const fieldsToInsert = fields.map((f: any) => ({
+        jobId: job.id,
+        label: f.label,
+        type: f.type || 'text',
+        isRequired: f.isRequired ?? true,
+        options: f.options ? JSON.stringify(f.options) : null
+      }));
+      const { error: fieldsError } = await supabase.from("JobField").insert(fieldsToInsert);
+      if (fieldsError) throw fieldsError;
+    }
+    res.json(job);
+  } catch (error: any) {
+    res.status(500).json({ error: "Failed to create job", details: error });
+  }
+});
+
+// Applications
+app.get("/api/applications/all", async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from("Application")
+      .select("*, job:Job(*), user:User(*, profile:UserProfile(*))")
+      .order("createdAt", { ascending: false });
+    if (error) throw error;
+    res.json(data);
+  } catch (error: any) {
+    res.status(500).json({ error: "Failed to fetch all applications" });
+  }
+});
+
+app.get("/api/applications/user/:userId", async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from("Application")
+      .select("*, job:Job(*)")
+      .eq("userId", req.params.userId);
+    if (error) throw error;
+    res.json(data);
+  } catch (error: any) {
+    res.status(500).json({ error: "Failed to fetch applications" });
+  }
+});
+
+app.get("/api/jobs/:id/applications", async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from("Application")
+      .select("*, user:User(*, profile:UserProfile(*))")
+      .eq("jobId", req.params.id);
+    if (error) throw error;
+    res.json(data);
+  } catch (error: any) {
+    res.status(500).json({ error: "Failed to fetch job applications" });
+  }
+});
+
+app.post("/api/jobs/:id/apply", async (req, res) => {
+  const { userId, answers, aiScore } = req.body;
+  try {
+    const { data, error } = await supabase
+      .from("Application")
+      .insert([{ jobId: req.params.id, userId, answers: JSON.stringify(answers), aiScore }])
+      .select()
+      .single();
+    if (error) throw error;
+    
+    // Notify recruiter
+    io.emit("new_application", { jobId: req.params.id, userId });
+    
+    res.json(data);
+  } catch (error: any) {
+    res.status(500).json({ error: "Failed to submit application" });
+  }
+});
+
+app.patch("/api/applications/:id/status", async (req, res) => {
+  const { status, recruiterNotes } = req.body;
+  try {
+    const { data, error } = await supabase
+      .from("Application")
+      .update({ status, recruiterNotes })
+      .eq("id", req.params.id)
+      .select()
+      .single();
+    if (error) throw error;
+    io.emit("application_status_updated", { applicationId: req.params.id, status });
+    res.json(data);
+  } catch (error: any) {
+    res.status(500).json({ error: "Failed to update application" });
+  }
+});
+
+// Companies
+app.get("/api/companies/:id", async (req, res) => {
+  try {
+    const { data, error } = await supabase.from("Company").select("*").eq("id", req.params.id).single();
+    if (error) throw error;
+    res.json(data);
+  } catch (error) {
+    res.status(404).json({ error: "Company not found" });
+  }
+});
+
+app.get("/api/companies/user/:userId", async (req, res) => {
+  try {
+    const { data: user } = await supabase.from("User").select("companyId").eq("id", req.params.userId).single();
+    if (!user?.companyId) return res.json(null);
+    
+    const { data, error } = await supabase.from("Company").select("*").eq("id", user.companyId).single();
+    if (error) throw error;
+    res.json(data);
+  } catch (error) {
+    res.json(null);
+  }
+});
+
+app.post("/api/companies", async (req, res) => {
+  const { id, name, description, website, logo, industry, location, adminId } = req.body;
+  try {
+    const { data: company, error } = await supabase
+      .from("Company")
+      .upsert({ id, name, description, website, logo, industry, location, adminId })
+      .select()
+      .single();
+    
+    if (error) throw error;
+
+    // Link user to company if not already linked
+    if (adminId) {
+      await supabase.from("User").update({ companyId: company.id }).eq("id", adminId);
+    }
+
+    res.json(company);
+  } catch (error: any) {
+    res.status(500).json({ error: "Failed to save company", details: error });
+  }
+});
+
+// Profile
+app.get("/api/profiles/:userId", async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from("UserProfile")
+      .select("*")
+      .eq("userId", req.params.userId)
+      .single();
+    if (error && error.code === "PGRST116") return res.json({ skills: "[]", education: "[]", experience: "[]" });
+    if (error) throw error;
+    res.json(data);
+  } catch (err) {
+    console.error("Profile fetch error:", err);
+    res.json({ skills: "[]", education: "[]", experience: "[]" });
+  }
+});
+
+app.post("/api/profiles", async (req, res) => {
+  const { userId, bio, skills, education, experience, resumeUrl, resumeText } = req.body;
+  try {
+    const { data, error } = await supabase
+      .from("UserProfile")
+      .upsert({ 
+        userId, 
+        bio, 
+        skills: Array.isArray(skills) ? JSON.stringify(skills) : skills, 
+        education: Array.isArray(education) ? JSON.stringify(education) : education, 
+        experience: Array.isArray(experience) ? JSON.stringify(experience) : experience, 
+        resumeUrl, 
+        resumeText,
+        updatedAt: new Date().toISOString()
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    res.json(data);
+  } catch (error: any) {
+    console.error("Profile save error:", error);
+    res.status(500).json({ error: "Failed to save profile", details: error });
+  }
+});
+
+// Talent Pool (Recruiter search)
+app.get("/api/talents", async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from("User")
+      .select("*, profile:UserProfile(*)")
+      .eq("role", "STUDENT");
+    if (error) throw error;
+    res.json(data);
+  } catch (error: any) {
+    res.status(500).json({ error: "Failed to fetch talent pool" });
   }
 });
 

@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Users, ClipboardList, BarChart3, Trash2, AlertCircle, Sparkles, Lock, Unlock, Download, Search, Tag, Pencil, X, Eye, CheckCircle2, XCircle, RefreshCw, Mail, Calendar, Send, MoreHorizontal } from 'lucide-react';
+import { Plus, Users, ClipboardList, BarChart3, Trash2, AlertCircle, Sparkles, Lock, Unlock, Download, Search, Tag, Pencil, X, Eye, CheckCircle2, XCircle, RefreshCw, Mail, Calendar, Send, MoreHorizontal, Settings, ChevronRight } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { useAuthStore } from '@/lib/store';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
@@ -15,6 +15,12 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { io } from 'socket.io-client';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { JobManager } from './JobManager';
+import { TalentPool } from './TalentPool';
+import { ApplicationReview } from './ApplicationReview';
+import { CompanyManager } from './CompanyManager';
+import { LayoutDashboard, Briefcase, Building2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
 const socket = io();
@@ -350,16 +356,47 @@ export const RecruiterDashboard = () => {
   };
 
   return (
-    <div className="container mx-auto p-6 space-y-8 max-w-7xl">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Recruiter Dashboard</h1>
-          <p className="text-muted-foreground">Manage your assessments and track student performance.</p>
+    <div className="container mx-auto p-4 md:p-6 space-y-8 max-w-full animate-in fade-in duration-700">
+      <div className="flex justify-between items-center bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
+        <div className="absolute top-0 right-0 p-12 opacity-5 pointer-events-none">
+          <LayoutDashboard className="w-32 h-32" />
         </div>
-        <Button onClick={() => setIsCreating(!isCreating)} className="gap-2">
-          {isCreating ? 'Cancel' : <><Plus className="w-4 h-4" /> Create New Test</>}
-        </Button>
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900 flex items-center gap-3">
+             Recruitment Suite
+          </h1>
+          <p className="text-muted-foreground mt-1">Orchestrate your talent pipeline and AI-driven assessments.</p>
+        </div>
+        <div className="flex gap-3">
+          <Button variant="outline" onClick={checkDatabase} className="gap-2 border-slate-200">
+            <Settings className={cn("w-4 h-4", isCheckingDb && "animate-spin")} /> Diagnostics
+          </Button>
+          <Button onClick={() => setIsCreating(!isCreating)} className="gap-2 bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-100">
+            {isCreating ? 'Dismiss' : <><Plus className="w-4 h-4" /> New Assessment</>}
+          </Button>
+        </div>
       </div>
+
+      <Tabs defaultValue="assessments" className="space-y-6">
+        <TabsList className="bg-white border p-1 rounded-xl h-12 w-full max-w-4xl shadow-sm grid grid-cols-5">
+          <TabsTrigger value="assessments" className="rounded-lg data-[state=active]:bg-indigo-50 data-[state=active]:text-indigo-700 gap-2">
+            <ClipboardList className="w-4 h-4" /> Assessments
+          </TabsTrigger>
+          <TabsTrigger value="jobs" className="rounded-lg data-[state=active]:bg-indigo-50 data-[state=active]:text-indigo-700 gap-2">
+            <Briefcase className="w-4 h-4" /> Job Board
+          </TabsTrigger>
+          <TabsTrigger value="applications" className="rounded-lg data-[state=active]:bg-indigo-50 data-[state=active]:text-indigo-700 gap-2">
+            <BarChart3 className="w-4 h-4" /> Pipeline
+          </TabsTrigger>
+          <TabsTrigger value="talents" className="rounded-lg data-[state=active]:bg-indigo-50 data-[state=active]:text-indigo-700 gap-2">
+            <Users className="w-4 h-4" /> Talent Pool
+          </TabsTrigger>
+          <TabsTrigger value="company" className="rounded-lg data-[state=active]:bg-indigo-50 data-[state=active]:text-indigo-700 gap-2">
+            <Building2 className="w-4 h-4" /> Company Profile
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="assessments" className="space-y-6 focus-visible:outline-none">
 
       {error && (
         <Card className="border-destructive/50 bg-destructive/5">
@@ -609,7 +646,7 @@ export const RecruiterDashboard = () => {
       <AnimatePresence>
         {selectedSubmission && (
           <Dialog open={!!selectedSubmission} onOpenChange={() => setSelectedSubmission(null)}>
-            <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+            <DialogContent className="max-w-[1500px] w-[98vw] max-h-[95vh] overflow-y-auto p-8">
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
                   Detailed Report: {selectedSubmission.user.name}
@@ -966,13 +1003,27 @@ export const RecruiterDashboard = () => {
                 </div>
               </TabsContent>
             </CardContent>
-          </Tabs>
-        </Card>
-      </div>
-    </div>
-  );
-};
+            </Tabs>
+          </Card>
+        </div>
+      </TabsContent>
 
-function cn(...inputs: any[]) {
-  return inputs.filter(Boolean).join(' ');
-}
+      <TabsContent value="jobs">
+        <JobManager user={user} />
+      </TabsContent>
+
+      <TabsContent value="applications">
+        <ApplicationReview user={user} />
+      </TabsContent>
+
+      <TabsContent value="talents">
+        <TalentPool />
+      </TabsContent>
+
+      <TabsContent value="company">
+        <CompanyManager user={user} />
+      </TabsContent>
+    </Tabs>
+  </div>
+);
+};

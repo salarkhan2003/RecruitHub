@@ -79,7 +79,7 @@ export const TestList: React.FC<TestListProps> = ({ onSelectTest }) => {
   });
 
   return (
-    <div className="container mx-auto p-6 max-w-5xl space-y-8">
+    <div className="container mx-auto p-6 max-w-full space-y-8">
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Available Assessments</h1>
