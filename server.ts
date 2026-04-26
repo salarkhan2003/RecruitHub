@@ -652,6 +652,8 @@ app.get("/api/submissions/user/:userId", async (req, res) => {
 });
 
 // Vite Setup
+export default app;
+
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
@@ -667,10 +669,13 @@ async function startServer() {
     });
   }
 
-  const PORT = 3000;
-  httpServer.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running at http://localhost:${PORT}`);
-  });
+  // Only listen if we're not in a serverless environment (like Vercel)
+  if (process.env.VERCEL !== '1') {
+    const PORT = 3000;
+    httpServer.listen(PORT, "0.0.0.0", () => {
+      console.log(`Server running at http://localhost:${PORT}`);
+    });
+  }
 }
 
 startServer();
